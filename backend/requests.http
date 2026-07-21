@@ -20,3 +20,37 @@ Content-Type: application/json
 ### Get current user (replace TOKEN with the token from login response)
 GET http://localhost:5000/api/auth/me
 Authorization: Bearer TOKEN
+
+### Register an admin user
+POST http://localhost:5000/api/auth/register
+Content-Type: application/json
+
+{
+  "name": "Admin User",
+  "email": "admin@example.com",
+  "password": "adminpass123",
+  "role": "admin"
+}
+
+### Create a category (as admin)
+POST http://localhost:5000/api/categories
+Content-Type: application/json
+Authorization: Bearer <admin token>
+
+{
+  "name": "Electronics",
+  "description": "Gadgets and devices"
+}
+
+### Create a product (as admin)
+POST http://localhost:5000/api/products
+Content-Type: application/json
+Authorization: Bearer <admin token>
+
+{
+  "name": "Wireless Mouse",
+  "description": "A wireless optical mouse",
+  "price": 29.99,
+  "stock": 50,
+  "category": "6a5f39ea98d59979a4f96ad6"
+}
