@@ -1,0 +1,1 @@
+A full-stack e-commerce and inventory management application built with Node.js, Express, MongoDB, and React. Features role-based authentication, product and order management, real-time stock control, and Stripe test-mode payment integration.
