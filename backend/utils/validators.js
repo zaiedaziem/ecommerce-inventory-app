@@ -43,6 +43,20 @@ const updateCategoryValidator = [
   body('description').optional().trim(),
 ];
 
+const createOrderValidator = [
+  body('items').isArray({ min: 1 }).withMessage('Order must contain at least one item'),
+  body('items.*.productId').isMongoId().withMessage('Each item must have a valid productId'),
+  body('items.*.quantity')
+    .isInt({ min: 1 })
+    .withMessage('Each item quantity must be an integer >= 1'),
+];
+
+const updateOrderStatusValidator = [
+  body('status')
+    .isIn(['pending', 'paid', 'shipped', 'delivered', 'cancelled'])
+    .withMessage('Invalid order status'),
+];
+
 module.exports = {
   registerValidator,
   loginValidator,
@@ -50,4 +64,6 @@ module.exports = {
   updateProductValidator,
   createCategoryValidator,
   updateCategoryValidator,
+  createOrderValidator,
+  updateOrderStatusValidator,
 };

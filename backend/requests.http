@@ -1,3 +1,7 @@
+@admin_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhNWYzN2RmMTMxZTQ1MDk1MWJjYTE3MCIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc4NjI4NTcyMCwiZXhwIjoxNzg2ODkwNTIwfQ.M8YqzVR2qOfwA5Kd4-npt21pMl72mqLtNHiT-n7RXj4
+
+@customer_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhNWYzM2M0OTRkNDUxYjgxNzU5NDQ2NCIsInJvbGUiOiJjdXN0b21lciIsImlhdCI6MTc4NjI4NTY0NSwiZXhwIjoxNzg2ODkwNDQ1fQ.zlt8yz3bSQ_g37x62Kt8tdqwLuUZdf30T0wZp38RbAQ
+
 ### Register a new customer
 POST http://localhost:5000/api/auth/register
 Content-Type: application/json
@@ -8,13 +12,22 @@ Content-Type: application/json
   "password": "password123"
 }
 
-### Login
+### Login customer user
 POST http://localhost:5000/api/auth/login
 Content-Type: application/json
 
 {
   "email": "test@example.com",
   "password": "password123"
+}
+
+### Login admin user
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "adminpass123"
 }
 
 ### Get current user (replace TOKEN with the token from login response)
@@ -35,7 +48,7 @@ Content-Type: application/json
 ### Create a category (as admin)
 POST http://localhost:5000/api/categories
 Content-Type: application/json
-Authorization: Bearer <admin token>
+Authorization: Bearer {{admin_token}}
 
 {
   "name": "Electronics",
@@ -45,7 +58,7 @@ Authorization: Bearer <admin token>
 ### Create a product (as admin)
 POST http://localhost:5000/api/products
 Content-Type: application/json
-Authorization: Bearer <admin token>
+Authorization: Bearer {{admin_token}}
 
 {
   "name": "Wireless Mouse",
@@ -53,4 +66,56 @@ Authorization: Bearer <admin token>
   "price": 29.99,
   "stock": 50,
   "category": "6a5f39ea98d59979a4f96ad6"
+}
+
+### Get all products (public, no auth)
+GET http://localhost:5000/api/products
+
+### Get single product (public, no auth)
+GET http://localhost:5000/api/products/6a5f3a1198d59979a4f96ad9
+
+### Try creating a product as a customer (should be 403)
+POST http://localhost:5000/api/products
+Content-Type: application/json
+Authorization: Bearer {{customer_token}}
+
+{
+  "name": "Should Fail",
+  "description": "Customer shouldn't be able to create this",
+  "price": 10,
+  "stock": 5,
+  "category": "6a5f39ea98d59979a4f96ad6"
+}
+
+### Update stock as admin
+PUT http://localhost:5000/api/products/6a5f3a1198d59979a4f96ad9
+Content-Type: application/json
+Authorization: Bearer {{admin_token}}
+
+{
+  "stock": 40
+}
+
+### Try creating a product with invalid price (should be 400)
+POST http://localhost:5000/api/products
+Content-Type: application/json
+Authorization: Bearer {{admin_token}}
+
+{
+  "name": "Bad Product",
+  "description": "Negative price",
+  "price": -5,
+  "stock": 10,
+  "category": "6a5f39ea98d59979a4f96ad6"
+}
+
+### Create an order (as customer)
+POST http://localhost:5000/api/orders
+Content-Type: application/json
+Authorization: Bearer {{customer_token}}
+
+{
+  "items": [
+    { "productId": "6a5f3a1198d59979a4f96ad9", "quantity": 2 }
+  ]
 }
