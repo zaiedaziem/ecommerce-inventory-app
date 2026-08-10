@@ -1,6 +1,7 @@
 @admin_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhNWYzN2RmMTMxZTQ1MDk1MWJjYTE3MCIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc4NjI4NTcyMCwiZXhwIjoxNzg2ODkwNTIwfQ.M8YqzVR2qOfwA5Kd4-npt21pMl72mqLtNHiT-n7RXj4
 
-@customer_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhNWYzM2M0OTRkNDUxYjgxNzU5NDQ2NCIsInJvbGUiOiJjdXN0b21lciIsImlhdCI6MTc4NjI4NTY0NSwiZXhwIjoxNzg2ODkwNDQ1fQ.zlt8yz3bSQ_g37x62Kt8tdqwLuUZdf30T0wZp38RbAQ
+
+@customer_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhNWYzM2M0OTRkNDUxYjgxNzU5NDQ2NCIsInJvbGUiOiJjdXN0b21lciIsImlhdCI6MTc4NjI4ODk1MSwiZXhwIjoxNzg2ODkzNzUxfQ.H6R000JXG9kPWpsHeNYd4l5FSm-tQKmZPHQRPsJswYY
 
 ### Register a new customer
 POST http://localhost:5000/api/auth/register
@@ -118,4 +119,67 @@ Authorization: Bearer {{customer_token}}
   "items": [
     { "productId": "6a5f3a1198d59979a4f96ad9", "quantity": 2 }
   ]
+}
+
+### Try ordering more than available stock (should fail, be rejected, and NOT touch stock)
+POST http://localhost:5000/api/orders
+Content-Type: application/json
+Authorization: Bearer {{customer_token}}
+
+{
+  "items": [
+    { "productId": "6a5f3a1198d59979a4f96ad9", "quantity": 1000 }
+  ]
+}
+
+### Try ordering with an invalid productId (should be 400)
+POST http://localhost:5000/api/orders
+Content-Type: application/json
+Authorization: Bearer {{customer_token}}
+
+{
+  "items": [
+    { "productId": "not-a-valid-id", "quantity": 1 }
+  ]
+}
+
+### Get my order history (as customer)
+GET http://localhost:5000/api/orders/my-orders
+Authorization: Bearer {{customer_token}}
+
+### Try getting all orders as customer (should be 403)
+GET http://localhost:5000/api/orders
+Authorization: Bearer {{customer_token}}
+
+### Get all orders (as admin)
+GET http://localhost:5000/api/orders
+Authorization: Bearer {{admin_token}}
+
+### Update order status (as admin) — replace ORDER_ID with an id from above
+PUT http://localhost:5000/api/orders/ORDER_ID/status
+Content-Type: application/json
+Authorization: Bearer {{admin_token}}
+
+{
+  "status": "shipped"
+}
+
+### Create a fresh order for Stripe checkout testing (as customer)
+POST http://localhost:5000/api/orders
+Content-Type: application/json
+Authorization: Bearer {{customer_token}}
+
+{
+  "items": [
+    { "productId": "6a5f3a1198d59979a4f96ad9", "quantity": 1 }
+  ]
+}
+
+### Create a Stripe checkout session — replace ORDER_ID with the _id from above
+POST http://localhost:5000/api/payments/checkout-session
+Content-Type: application/json
+Authorization: Bearer {{customer_token}}
+
+{
+  "orderId": "6a789a9f4f42d851ab17e435"
 }

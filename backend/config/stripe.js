@@ -1,1 +1,5 @@
-// Initializes and exports the Stripe SDK client using the secret key from env.
+const Stripe = require('stripe');
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+module.exports = stripe;
