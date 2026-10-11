@@ -2,10 +2,8 @@ const stripe = require('../config/stripe');
 const Order = require('../models/Order');
 const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
-const {
-  createCheckoutSession,
-  markOrderPaidFromSession,
-} = require('../services/paymentService');
+const { createCheckoutSession } = require('../services/paymentService');
+const { markOrderPaid, cancelOrderForExpiredSession } = require('../services/orderService');
 
 // POST /api/payments/checkout-session (customer) — starts Stripe checkout for a pending order.
 const createCheckoutSessionHandler = asyncHandler(async (req, res, next) => {
@@ -47,8 +45,12 @@ const handleWebhook = asyncHandler(async (req, res, next) => {
     return next(new AppError(`Webhook signature verification failed: ${err.message}`, 400));
   }
 
-  if (event.type === 'checkout.session.completed') {
-    await markOrderPaidFromSession(event.data.object);
+  const session = event.data.object;
+
+  if (event.type === 'checkout.session.completed' && session.payment_status === 'paid') {
+    await markOrderPaid(session.metadata.orderId, session.id, session.payment_intent);
+  } else if (event.type === 'checkout.session.expired') {
+    await cancelOrderForExpiredSession(session.metadata.orderId, session.id);
   }
 
   res.status(200).json({ received: true });

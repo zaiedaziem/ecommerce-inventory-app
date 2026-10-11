@@ -21,4 +21,10 @@ async function deductStock(productId, quantity, session) {
   return product;
 }
 
-module.exports = { deductStock };
+// Returns stock for a single product within a transaction session (e.g. on order cancellation).
+// A product deleted since the order was placed is skipped, as there is nothing to restock.
+async function restoreStock(productId, quantity, session) {
+  await Product.updateOne({ _id: productId }, { $inc: { stock: quantity } }, { session });
+}
+
+module.exports = { deductStock, restoreStock };

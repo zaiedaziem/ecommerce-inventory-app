@@ -46,8 +46,17 @@ const orderSchema = new mongoose.Schema(
       enum: ['pending', 'paid', 'shipped', 'delivered', 'cancelled'],
       default: 'pending',
     },
+    // Most recent Stripe Checkout Session for this order. Used to reuse an open session
+    // instead of creating duplicates, and to ignore expiry events from superseded sessions.
+    stripeSessionId: { type: String },
+    stripePaymentIntentId: { type: String },
+    paidAt: { type: Date },
+    cancelledAt: { type: Date },
   },
   { timestamps: true }
 );
+
+// Supports the periodic sweep for stale pending orders.
+orderSchema.index({ status: 1, createdAt: 1 });
 
 module.exports = mongoose.model('Order', orderSchema);

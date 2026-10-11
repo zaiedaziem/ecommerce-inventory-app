@@ -2,7 +2,10 @@ const { validationResult } = require('express-validator');
 const Order = require('../models/Order');
 const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
-const { createOrder: createOrderService } = require('../services/orderService');
+const {
+  createOrder: createOrderService,
+  updateOrderStatus: updateOrderStatusService,
+} = require('../services/orderService');
 
 // POST /api/orders (customer)
 const createOrder = asyncHandler(async (req, res, next) => {
@@ -53,22 +56,14 @@ const getOrder = asyncHandler(async (req, res, next) => {
   res.status(200).json({ success: true, order });
 });
 
-// PUT /api/orders/:id/status (admin)
+// PUT /api/orders/:id/status (admin). Enforces allowed transitions; cancelling restocks.
 const updateOrderStatus = asyncHandler(async (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return next(new AppError(errors.array()[0].msg, 400));
   }
 
-  const order = await Order.findByIdAndUpdate(
-    req.params.id,
-    { status: req.body.status },
-    { new: true, runValidators: true }
-  );
-
-  if (!order) {
-    return next(new AppError('Order not found', 404));
-  }
+  const order = await updateOrderStatusService(req.params.id, req.body.status);
 
   res.status(200).json({ success: true, order });
 });

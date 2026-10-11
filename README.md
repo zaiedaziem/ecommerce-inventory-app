@@ -4,10 +4,11 @@ A full-stack e-commerce and inventory management application with role-based aut
 
 ## Features
 
-- **Auth** — JWT-based registration/login with `admin` and `customer` roles
+- **Auth** — JWT-based registration/login with `admin` and `customer` roles (public sign-up always creates customers; admins are created via a CLI script)
 - **Products & Categories** — public browsing, admin-only create/update/delete, search/filter/pagination
-- **Orders** — atomic, transaction-safe stock deduction that prevents overselling under concurrent requests; customer order history; admin order management with status updates
-- **Payments** — Stripe Checkout Session integration (MYR currency) with webhook-driven order status updates
+- **Orders** — atomic, transaction-safe stock deduction that prevents overselling under concurrent requests; customer order history; admin order management
+- **Order lifecycle** — enforced status transitions (`pending → paid → shipped → delivered`, with cancellation allowed before shipping); cancelling returns stock to inventory; abandoned checkouts are cancelled automatically so they don't hold stock
+- **Payments** — Stripe Checkout Session integration (MYR currency) with idempotent, webhook-driven order status updates (`checkout.session.completed` / `checkout.session.expired`)
 - **Admin dashboard** — manage products, categories, and orders from the UI
 - **Centralized error handling & input validation** on every route
 
@@ -65,6 +66,14 @@ JWT_EXPIRES_IN=7d
 CLIENT_URL=http://localhost:5173
 STRIPE_SECRET_KEY=<your Stripe test secret key>
 STRIPE_WEBHOOK_SECRET=<from `stripe listen`, see below>
+# Optional: minutes before an unpaid order is auto-cancelled and its stock released (default 60)
+PENDING_ORDER_TTL_MINUTES=60
+```
+
+Create an admin account (or promote an existing user):
+
+```bash
+npm run create-admin -- admin@example.com <password> "Admin User"
 ```
 
 ### 2. Frontend setup

@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
 import * as orderApi from '../../api/orderApi';
 
-const STATUS_OPTIONS = ['pending', 'paid', 'shipped', 'delivered', 'cancelled'];
+// Mirrors ORDER_TRANSITIONS in backend/services/orderService.js, which is the source of truth.
+const NEXT_STATUSES = {
+  pending: ['paid', 'cancelled'],
+  paid: ['shipped', 'cancelled'],
+  shipped: ['delivered'],
+  delivered: [],
+  cancelled: [],
+};
 
 const STATUS_STYLES = {
   pending: 'bg-amber-100 text-amber-700',
@@ -31,11 +38,16 @@ export default function AdminOrdersPage() {
   }, []);
 
   const handleStatusChange = async (orderId, status) => {
+    if (status === 'cancelled' && !window.confirm('Cancel this order? Its stock will be returned to inventory.')) {
+      return;
+    }
     setUpdatingId(orderId);
     setError('');
     try {
-      await orderApi.updateOrderStatus(orderId, status);
-      setOrders((prev) => prev.map((o) => (o._id === orderId ? { ...o, status } : o)));
+      const { data } = await orderApi.updateOrderStatus(orderId, status);
+      setOrders((prev) =>
+        prev.map((o) => (o._id === orderId ? { ...o, status: data.order.status } : o))
+      );
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update order status');
     } finally {
@@ -70,18 +82,23 @@ export default function AdminOrdersPage() {
                 >
                   {order.status}
                 </span>
-                <select
-                  value={order.status}
-                  disabled={updatingId === order._id}
-                  onChange={(e) => handleStatusChange(order._id, e.target.value)}
-                  className="rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
-                >
-                  {STATUS_OPTIONS.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
+                {NEXT_STATUSES[order.status]?.length > 0 && (
+                  <select
+                    value=""
+                    disabled={updatingId === order._id}
+                    onChange={(e) => handleStatusChange(order._id, e.target.value)}
+                    className="rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+                  >
+                    <option value="" disabled>
+                      Change to…
                     </option>
-                  ))}
-                </select>
+                    {NEXT_STATUSES[order.status].map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 

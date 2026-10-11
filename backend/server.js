@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const errorHandler = require('./middlewares/errorHandler');
+const { cancelStalePendingOrders } = require('./services/orderService');
 const authRoutes = require('./routes/authRoutes');
 const productRoutes = require('./routes/productRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
@@ -37,3 +38,18 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+// Release stock held by abandoned checkouts. Runs in-process, which is fine for a single
+// instance; with multiple instances this would move to a scheduled job or a locked worker.
+const STALE_ORDER_SWEEP_INTERVAL_MS = 5 * 60 * 1000;
+const STALE_ORDER_MAX_AGE_MINUTES = Number(process.env.PENDING_ORDER_TTL_MINUTES) || 60;
+setInterval(async () => {
+  try {
+    const count = await cancelStalePendingOrders(STALE_ORDER_MAX_AGE_MINUTES);
+    if (count > 0) {
+      console.log(`Cancelled ${count} stale pending order(s)`);
+    }
+  } catch (err) {
+    console.error(`Stale order sweep failed: ${err.message}`);
+  }
+}, STALE_ORDER_SWEEP_INTERVAL_MS);
