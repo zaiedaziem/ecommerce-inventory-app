@@ -1,16 +1,28 @@
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const { deductStock, restoreStock } = require('./inventoryService');
-const { releaseCheckoutSession } = require('./paymentService');
+const { releaseCheckoutSession, refundOrderPayment } = require('./paymentService');
 const AppError = require('../utils/AppError');
 
 // Allowed order status transitions. Terminal states have no outgoing transitions.
+// Who may trigger each one:
+//   pending -> paid       Stripe webhook only (never set by hand)
+//   paid -> shipped       admin
+//   pending/paid -> cancelled   customer (paid orders are refunded), or the stale-order sweep
+//   shipped -> delivered  customer confirms receipt
 const ORDER_TRANSITIONS = {
   pending: ['paid', 'cancelled'],
   paid: ['shipped', 'cancelled'],
   shipped: ['delivered'],
   delivered: [],
   cancelled: [],
+};
+
+const STATUS_TIMESTAMPS = {
+  paid: 'paidAt',
+  shipped: 'shippedAt',
+  delivered: 'deliveredAt',
+  cancelled: 'cancelledAt',
 };
 
 function canTransition(from, to) {
@@ -46,9 +58,9 @@ async function applyTransition(order, newStatus, session, extraFields = {}) {
     for (const item of order.items) {
       await restoreStock(item.product, item.quantity, session);
     }
-    order.cancelledAt = new Date();
   }
 
+  order[STATUS_TIMESTAMPS[newStatus]] = new Date();
   order.status = newStatus;
   Object.assign(order, extraFields);
   await order.save({ session });
@@ -84,39 +96,82 @@ async function createOrder(userId, items) {
   });
 }
 
-// Cancels an order and returns its stock. For a pending order with an open Stripe
-// Checkout Session, the session is expired first so the customer can't pay afterwards.
+// Loads an order and checks that `userId` placed it.
+async function findOwnOrder(orderId, userId) {
+  const order = await Order.findById(orderId);
+  if (!order) {
+    throw new AppError('Order not found', 404);
+  }
+  if (order.user.toString() !== userId.toString()) {
+    throw new AppError('You do not have permission to change this order', 403);
+  }
+  return order;
+}
+
+// Cancels an order and returns its stock.
+// - Pending: any open Stripe Checkout Session is expired first so it can't be paid afterwards.
+// - Paid: the status change commits first, then the payment is refunded. Cancelling before
+//   refunding means a concurrent "mark as shipped" can't slip in after money was returned;
+//   if the refund call fails, the order is flagged refundStatus 'failed' for follow-up.
 async function cancelOrder(orderId) {
   const order = await Order.findById(orderId);
   if (!order) {
     throw new AppError('Order not found', 404);
   }
   if (order.status !== 'cancelled' && !canTransition(order.status, 'cancelled')) {
-    throw new AppError(`Cannot cancel an order that is ${order.status}`, 400);
+    const reason = order.status === 'shipped' || order.status === 'delivered'
+      ? 'it has already been shipped'
+      : `it is ${order.status}`;
+    throw new AppError(`This order can no longer be cancelled because ${reason}`, 400);
   }
 
   if (order.status === 'pending' && order.stripeSessionId) {
     await releaseCheckoutSession(order.stripeSessionId);
   }
 
-  return runInTransaction(async (session) => {
+  let needsRefund = false;
+  const cancelled = await runInTransaction(async (session) => {
     const current = await Order.findById(orderId).session(session);
-    return applyTransition(current, 'cancelled', session);
+    needsRefund = current.status === 'paid' && Boolean(current.stripePaymentIntentId);
+    return applyTransition(current, 'cancelled', session, needsRefund ? { refundStatus: 'pending' } : {});
+  });
+
+  if (needsRefund) {
+    await refundOrderPayment(cancelled);
+  }
+  return cancelled;
+}
+
+// Customer cancels their own order (allowed until it ships).
+async function cancelOwnOrder(orderId, userId) {
+  await findOwnOrder(orderId, userId);
+  return cancelOrder(orderId);
+}
+
+// Customer confirms a shipped order arrived.
+async function confirmOrderReceived(orderId, userId) {
+  await findOwnOrder(orderId, userId);
+  return runInTransaction(async (session) => {
+    const order = await Order.findById(orderId).session(session);
+    if (order.status !== 'shipped' && order.status !== 'delivered') {
+      throw new AppError('Only shipped orders can be marked as received', 400);
+    }
+    return applyTransition(order, 'delivered', session);
   });
 }
 
-// Admin status update. Cancellation goes through cancelOrder for Stripe cleanup and restock.
-async function updateOrderStatus(orderId, newStatus) {
-  if (newStatus === 'cancelled') {
-    return cancelOrder(orderId);
-  }
-
+// Admin status update. Admins only ship paid orders: payment is confirmed by Stripe,
+// and cancelling or confirming delivery is up to the customer.
+async function shipOrder(orderId) {
   return runInTransaction(async (session) => {
     const order = await Order.findById(orderId).session(session);
     if (!order) {
       throw new AppError('Order not found', 404);
     }
-    return applyTransition(order, newStatus, session);
+    if (order.status !== 'paid' && order.status !== 'shipped') {
+      throw new AppError(`Only paid orders can be shipped (this order is ${order.status})`, 400);
+    }
+    return applyTransition(order, 'shipped', session);
   });
 }
 
@@ -137,11 +192,7 @@ async function markOrderPaid(orderId, stripeSessionId, stripePaymentIntentId) {
       }
       return order;
     }
-    return applyTransition(order, 'paid', session, {
-      stripeSessionId,
-      stripePaymentIntentId,
-      paidAt: new Date(),
-    });
+    return applyTransition(order, 'paid', session, { stripeSessionId, stripePaymentIntentId });
   });
 }
 
@@ -179,7 +230,9 @@ module.exports = {
   ORDER_TRANSITIONS,
   createOrder,
   cancelOrder,
-  updateOrderStatus,
+  cancelOwnOrder,
+  confirmOrderReceived,
+  shipOrder,
   markOrderPaid,
   cancelOrderForExpiredSession,
   cancelStalePendingOrders,

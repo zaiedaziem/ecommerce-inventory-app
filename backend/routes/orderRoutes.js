@@ -4,9 +4,11 @@ const {
   getMyOrders,
   getAllOrders,
   getOrder,
-  updateOrderStatus,
+  shipOrder,
+  cancelOrder,
+  receiveOrder,
 } = require('../controllers/orderController');
-const { createOrderValidator, updateOrderStatusValidator } = require('../utils/validators');
+const { createOrderValidator } = require('../utils/validators');
 const { protect } = require('../middlewares/authMiddleware');
 const { restrictTo } = require('../middlewares/roleMiddleware');
 
@@ -18,6 +20,9 @@ router.post('/', createOrderValidator, createOrder);
 router.get('/my-orders', getMyOrders);
 router.get('/', restrictTo('admin'), getAllOrders);
 router.get('/:id', getOrder);
-router.put('/:id/status', restrictTo('admin'), updateOrderStatusValidator, updateOrderStatus);
+router.put('/:id/ship', restrictTo('admin'), shipOrder);
+// Owner-only checks for these two live in the order service.
+router.put('/:id/cancel', cancelOrder);
+router.put('/:id/receive', receiveOrder);
 
 module.exports = router;

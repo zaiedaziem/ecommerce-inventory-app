@@ -69,12 +69,6 @@ const createOrderValidator = [
     .withMessage('Each item quantity must be an integer >= 1'),
 ];
 
-const updateOrderStatusValidator = [
-  body('status')
-    .isIn(['pending', 'paid', 'shipped', 'delivered', 'cancelled'])
-    .withMessage('Invalid order status'),
-];
-
 module.exports = {
   registerValidator,
   loginValidator,
@@ -83,5 +77,4 @@ module.exports = {
   createCategoryValidator,
   updateCategoryValidator,
   createOrderValidator,
-  updateOrderStatusValidator,
 };

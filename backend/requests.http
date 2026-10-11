@@ -35,7 +35,7 @@ Content-Type: application/json
 GET http://localhost:5000/api/auth/me
 Authorization: Bearer TOKEN
 
-### Attempt to self-register as admin � role is ignored, user is created as a customer.
+### Attempt to self-register as admin � role is ignored, user is created as a customer.
 ### Create admins with `npm run create-admin -- <email> <password> [name]` instead.
 POST http://localhost:5000/api/auth/register
 Content-Type: application/json
@@ -156,14 +156,17 @@ Authorization: Bearer {{customer_token}}
 GET http://localhost:5000/api/orders
 Authorization: Bearer {{admin_token}}
 
-### Update order status (as admin) — replace ORDER_ID with an id from above
-PUT http://localhost:5000/api/orders/ORDER_ID/status
-Content-Type: application/json
+### Mark a paid order as shipped (as admin) — replace ORDER_ID with an id from above
+PUT http://localhost:5000/api/orders/ORDER_ID/ship
 Authorization: Bearer {{admin_token}}
 
-{
-  "status": "shipped"
-}
+### Cancel own order before it ships (as customer) — paid orders are refunded via Stripe
+PUT http://localhost:5000/api/orders/ORDER_ID/cancel
+Authorization: Bearer {{customer_token}}
+
+### Confirm a shipped order was received (as customer)
+PUT http://localhost:5000/api/orders/ORDER_ID/receive
+Authorization: Bearer {{customer_token}}
 
 ### Create a fresh order for Stripe checkout testing (as customer)
 POST http://localhost:5000/api/orders

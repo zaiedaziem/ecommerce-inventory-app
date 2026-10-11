@@ -1,22 +1,6 @@
 import { useEffect, useState } from 'react';
 import * as orderApi from '../../api/orderApi';
-
-// Mirrors ORDER_TRANSITIONS in backend/services/orderService.js, which is the source of truth.
-const NEXT_STATUSES = {
-  pending: ['paid', 'cancelled'],
-  paid: ['shipped', 'cancelled'],
-  shipped: ['delivered'],
-  delivered: [],
-  cancelled: [],
-};
-
-const STATUS_STYLES = {
-  pending: 'bg-amber-100 text-amber-700',
-  paid: 'bg-emerald-100 text-emerald-700',
-  shipped: 'bg-blue-100 text-blue-700',
-  delivered: 'bg-slate-200 text-slate-700',
-  cancelled: 'bg-red-100 text-red-700',
-};
+import OrderStatusBadge from '../../components/OrderStatusBadge';
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
@@ -37,19 +21,17 @@ export default function AdminOrdersPage() {
     loadOrders();
   }, []);
 
-  const handleStatusChange = async (orderId, status) => {
-    if (status === 'cancelled' && !window.confirm('Cancel this order? Its stock will be returned to inventory.')) {
-      return;
-    }
+  // Admins only ship paid orders; payment comes from Stripe and cancel/receive are customer actions.
+  const handleShip = async (orderId) => {
     setUpdatingId(orderId);
     setError('');
     try {
-      const { data } = await orderApi.updateOrderStatus(orderId, status);
+      const { data } = await orderApi.shipOrder(orderId);
       setOrders((prev) =>
         prev.map((o) => (o._id === orderId ? { ...o, status: data.order.status } : o))
       );
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update order status');
+      setError(err.response?.data?.message || 'Failed to mark order as shipped');
     } finally {
       setUpdatingId(null);
     }
@@ -75,29 +57,15 @@ export default function AdminOrdersPage() {
               </div>
 
               <div className="flex items-center gap-2">
-                <span
-                  className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${
-                    STATUS_STYLES[order.status] || 'bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  {order.status}
-                </span>
-                {NEXT_STATUSES[order.status]?.length > 0 && (
-                  <select
-                    value=""
+                <OrderStatusBadge order={order} />
+                {order.status === 'paid' && (
+                  <button
+                    onClick={() => handleShip(order._id)}
                     disabled={updatingId === order._id}
-                    onChange={(e) => handleStatusChange(order._id, e.target.value)}
-                    className="rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+                    className="px-3 py-1.5 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60 transition-colors"
                   >
-                    <option value="" disabled>
-                      Change to…
-                    </option>
-                    {NEXT_STATUSES[order.status].map((status) => (
-                      <option key={status} value={status}>
-                        {status}
-                      </option>
-                    ))}
-                  </select>
+                    {updatingId === order._id ? 'Updating…' : 'Mark as shipped'}
+                  </button>
                 )}
               </div>
             </div>

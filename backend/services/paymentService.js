@@ -64,4 +64,25 @@ async function releaseCheckoutSession(sessionId) {
   }
 }
 
-module.exports = { createCheckoutSession, releaseCheckoutSession };
+// Refunds the full payment for a cancelled order and records the outcome on the order.
+// The idempotency key makes a retry for the same order return the original refund rather
+// than refunding twice. Never throws: a failure is recorded as refundStatus 'failed'.
+async function refundOrderPayment(order) {
+  try {
+    const refund = await stripe.refunds.create(
+      { payment_intent: order.stripePaymentIntentId, metadata: { orderId: order._id.toString() } },
+      { idempotencyKey: `refund-order-${order._id}` }
+    );
+    // Card refunds are accepted as 'succeeded' or 'pending' (settling); both mean refunded.
+    const refundStatus = refund.status === 'failed' || refund.status === 'canceled' ? 'failed' : 'refunded';
+    await Order.updateOne({ _id: order._id }, { refundStatus, stripeRefundId: refund.id });
+    Object.assign(order, { refundStatus, stripeRefundId: refund.id });
+  } catch (err) {
+    console.error(`Refund failed for order ${order._id}: ${err.message}`);
+    await Order.updateOne({ _id: order._id }, { refundStatus: 'failed' });
+    order.refundStatus = 'failed';
+  }
+  return order;
+}
+
+module.exports = { createCheckoutSession, releaseCheckoutSession, refundOrderPayment };

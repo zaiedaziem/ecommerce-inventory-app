@@ -139,9 +139,15 @@ async function seedOrders(users, products) {
       await cancelOrder(order._id);
     } else {
       // Demo orders skip Stripe, so mark them paid (and beyond) directly.
+      const after = (hours) => new Date(placedAt.getTime() + hours * 60 * 60 * 1000);
       await Order.updateOne(
         { _id: order._id },
-        { status: spec.status, paidAt: new Date(placedAt.getTime() + 5 * 60 * 1000) }
+        {
+          status: spec.status,
+          paidAt: after(0.1),
+          ...(spec.status !== 'paid' && { shippedAt: after(24) }),
+          ...(spec.status === 'delivered' && { deliveredAt: after(72) }),
+        }
       );
     }
     // createdAt is immutable through Mongoose, so backdate via the driver.

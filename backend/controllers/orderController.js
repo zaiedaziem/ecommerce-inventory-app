@@ -4,7 +4,9 @@ const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
 const {
   createOrder: createOrderService,
-  updateOrderStatus: updateOrderStatusService,
+  shipOrder: shipOrderService,
+  cancelOwnOrder,
+  confirmOrderReceived,
 } = require('../services/orderService');
 
 // POST /api/orders (customer)
@@ -56,15 +58,21 @@ const getOrder = asyncHandler(async (req, res, next) => {
   res.status(200).json({ success: true, order });
 });
 
-// PUT /api/orders/:id/status (admin). Enforces allowed transitions; cancelling restocks.
-const updateOrderStatus = asyncHandler(async (req, res, next) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return next(new AppError(errors.array()[0].msg, 400));
-  }
+// PUT /api/orders/:id/ship (admin) — paid -> shipped
+const shipOrder = asyncHandler(async (req, res) => {
+  const order = await shipOrderService(req.params.id);
+  res.status(200).json({ success: true, order });
+});
 
-  const order = await updateOrderStatusService(req.params.id, req.body.status);
+// PUT /api/orders/:id/cancel (order owner) — allowed until shipped; paid orders are refunded
+const cancelOrder = asyncHandler(async (req, res) => {
+  const order = await cancelOwnOrder(req.params.id, req.user._id);
+  res.status(200).json({ success: true, order });
+});
 
+// PUT /api/orders/:id/receive (order owner) — shipped -> delivered
+const receiveOrder = asyncHandler(async (req, res) => {
+  const order = await confirmOrderReceived(req.params.id, req.user._id);
   res.status(200).json({ success: true, order });
 });
 
@@ -73,5 +81,7 @@ module.exports = {
   getMyOrders,
   getAllOrders,
   getOrder,
-  updateOrderStatus,
+  shipOrder,
+  cancelOrder,
+  receiveOrder,
 };
