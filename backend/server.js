@@ -20,7 +20,9 @@ app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:3000' }));
 // registered with express.raw() before the global express.json() parser below.
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 
-app.use(express.json());
+// Raised from the 100kb default so product payloads can carry a base64 image
+// (capped at 500 KB decoded, about 670 KB encoded, in validators.js).
+app.use(express.json({ limit: '1mb' }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);

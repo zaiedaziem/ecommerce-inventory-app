@@ -2,15 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import * as productApi from '../api/productApi';
 import { useCart } from '../context/CartContext';
-
-function initials(name) {
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-}
+import ProductImage from '../components/ProductImage';
 
 export default function ProductDetailPage() {
   const { id } = useParams();
@@ -46,9 +38,11 @@ export default function ProductDetailPage() {
       </Link>
 
       <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-8 bg-white rounded-xl border border-slate-200 shadow-sm p-6">
-        <div className="h-64 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
-          <span className="text-white text-6xl font-bold opacity-90">{initials(product.name)}</span>
-        </div>
+        <ProductImage
+          product={product}
+          className="w-full h-64 md:h-80 rounded-lg"
+          textClassName="text-6xl"
+        />
 
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{product.name}</h1>

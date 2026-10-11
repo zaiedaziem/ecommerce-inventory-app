@@ -6,6 +6,7 @@ A full-stack e-commerce and inventory management application with role-based aut
 
 - **Auth** — JWT-based registration/login with `admin` and `customer` roles (public sign-up always creates customers; admins are created via a CLI script)
 - **Products & Categories** — public browsing, admin-only create/update/delete, search/filter/pagination
+- **Product photos** — admins upload a photo that is resized (max 800px) and compressed to WebP in the browser, then stored as a base64 data URI on the product; the server validates type (JPEG/PNG/WebP only) and size (≤ 500 KB)
 - **Orders** — atomic, transaction-safe stock deduction that prevents overselling under concurrent requests; customer order history; admin order management
 - **Order lifecycle** — enforced status transitions (`pending → paid → shipped → delivered`, with cancellation allowed before shipping); cancelling returns stock to inventory; abandoned checkouts are cancelled automatically so they don't hold stock
 - **Payments** — Stripe Checkout Session integration (MYR currency) with idempotent, webhook-driven order status updates (`checkout.session.completed` / `checkout.session.expired`)

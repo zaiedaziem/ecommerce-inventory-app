@@ -25,7 +25,7 @@ const createProduct = asyncHandler(async (req, res, next) => {
     return next(new AppError(errors.array()[0].msg, 400));
   }
 
-  const { name, description, price, stock, category } = req.body;
+  const { name, description, price, stock, category, image } = req.body;
 
   const product = await Product.create({
     name,
@@ -33,6 +33,7 @@ const createProduct = asyncHandler(async (req, res, next) => {
     price,
     stock,
     category,
+    image,
     createdBy: req.user._id,
   });
 
@@ -46,11 +47,12 @@ const updateProduct = asyncHandler(async (req, res, next) => {
     return next(new AppError(errors.array()[0].msg, 400));
   }
 
-  const { name, description, price, stock, category } = req.body;
+  // image: omitted = keep current, null = remove, data URI = replace
+  const { name, description, price, stock, category, image } = req.body;
 
   const product = await Product.findByIdAndUpdate(
     req.params.id,
-    { name, description, price, stock, category },
+    { name, description, price, stock, category, image },
     { new: true, runValidators: true, omitUndefined: true }
   );
 

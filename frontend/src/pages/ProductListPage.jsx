@@ -2,17 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import * as productApi from '../api/productApi';
 import * as categoryApi from '../api/categoryApi';
+import ProductImage from '../components/ProductImage';
 
 const PAGE_SIZE = 8;
-
-function initials(name) {
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-}
 
 export default function ProductListPage() {
   const [products, setProducts] = useState([]);
@@ -101,11 +93,7 @@ export default function ProductListPage() {
                 to={`/products/${product._id}`}
                 className="group bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all overflow-hidden"
               >
-                <div className="h-32 bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
-                  <span className="text-white text-3xl font-bold opacity-90">
-                    {initials(product.name)}
-                  </span>
-                </div>
+                <ProductImage product={product} className="w-full h-40" />
                 <div className="p-4">
                   <h3 className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">
                     {product.name}

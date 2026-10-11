@@ -28,6 +28,12 @@ const productSchema = new mongoose.Schema(
       ref: 'Category',
       required: [true, 'Product category is required'],
     },
+    // Product photo as a base64 data URI (e.g. "data:image/webp;base64,..."). The client
+    // resizes and compresses it before upload; the size cap is enforced in validators.js.
+    image: {
+      type: String,
+      default: null,
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

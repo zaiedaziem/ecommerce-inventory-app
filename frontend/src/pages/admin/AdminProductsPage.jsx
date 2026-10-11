@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import * as productApi from '../../api/productApi';
 import * as categoryApi from '../../api/categoryApi';
+import ProductImage from '../../components/ProductImage';
+import { compressImage } from '../../utils/compressImage';
 
-const emptyForm = { name: '', description: '', price: '', stock: '', category: '' };
+const emptyForm = { name: '', description: '', price: '', stock: '', category: '', image: null };
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState([]);
@@ -12,6 +14,9 @@ export default function AdminProductsPage() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [processingImage, setProcessingImage] = useState(false);
+  // Bumped on reset so the file input is remounted and forgets its previous selection.
+  const [fileInputKey, setFileInputKey] = useState(0);
 
   const loadData = () => {
     setLoading(true);
@@ -36,12 +41,36 @@ export default function AdminProductsPage() {
       price: product.price,
       stock: product.stock,
       category: product.category?._id || '',
+      image: product.image || null,
     });
+    setFileInputKey((k) => k + 1);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setFileInputKey((k) => k + 1);
+  };
+
+  const handleImageChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setProcessingImage(true);
+    setError('');
+    try {
+      const image = await compressImage(file);
+      setForm((prev) => ({ ...prev, image }));
+    } catch (err) {
+      setError(err.message);
+      setFileInputKey((k) => k + 1);
+    } finally {
+      setProcessingImage(false);
+    }
+  };
+
+  const removeImage = () => {
+    setForm((prev) => ({ ...prev, image: null }));
+    setFileInputKey((k) => k + 1);
   };
 
   const handleSubmit = async (e) => {
@@ -55,6 +84,7 @@ export default function AdminProductsPage() {
         price: Number(form.price),
         stock: Number(form.stock),
         category: form.category,
+        image: form.image,
       };
       if (editingId) {
         await productApi.updateProduct(editingId, payload);
@@ -149,12 +179,43 @@ export default function AdminProductsPage() {
               </select>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Photo</label>
+              {form.image && (
+                <div className="mb-2 flex items-end gap-3">
+                  <img
+                    src={form.image}
+                    alt="Product preview"
+                    className="h-24 w-24 rounded-md object-cover border border-slate-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="text-sm text-red-600 hover:underline"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+              <input
+                key={fileInputKey}
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                disabled={processingImage}
+                className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-indigo-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-indigo-700 hover:file:bg-indigo-100"
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                {processingImage ? 'Compressing…' : 'Resized to 800px and compressed before upload.'}
+              </p>
+            </div>
+
             {error && <p className="text-red-600 text-sm">{error}</p>}
 
             <div className="flex gap-2 pt-1">
               <button
                 type="submit"
-                disabled={saving}
+                disabled={saving || processingImage}
                 className="flex-1 py-2 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60 transition-colors"
               >
                 {saving ? 'Saving…' : editingId ? 'Update' : 'Create'}
@@ -191,7 +252,16 @@ export default function AdminProductsPage() {
               <tbody className="divide-y divide-slate-100">
                 {products.map((product) => (
                   <tr key={product._id}>
-                    <td className="px-4 py-3 font-medium text-slate-900">{product.name}</td>
+                    <td className="px-4 py-3 font-medium text-slate-900">
+                      <div className="flex items-center gap-3">
+                        <ProductImage
+                          product={product}
+                          className="h-10 w-10 shrink-0 rounded-md"
+                          textClassName="text-xs"
+                        />
+                        {product.name}
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-slate-600">{product.category?.name || '—'}</td>
                     <td className="px-4 py-3 text-slate-600">RM {product.price.toFixed(2)}</td>
                     <td className="px-4 py-3 text-slate-600">{product.stock}</td>
