@@ -35,7 +35,8 @@ Content-Type: application/json
 GET http://localhost:5000/api/auth/me
 Authorization: Bearer TOKEN
 
-### Register an admin user
+### Attempt to self-register as admin — role is ignored, user is created as a customer.
+### Create admins with `npm run create-admin -- <email> <password> [name]` instead.
 POST http://localhost:5000/api/auth/register
 Content-Type: application/json
 

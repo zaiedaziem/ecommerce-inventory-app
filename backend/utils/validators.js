@@ -6,10 +6,6 @@ const registerValidator = [
   body('password')
     .isLength({ min: 8 })
     .withMessage('Password must be at least 8 characters long'),
-  body('role')
-    .optional()
-    .isIn(['admin', 'customer'])
-    .withMessage('Role must be either admin or customer'),
 ];
 
 const loginValidator = [

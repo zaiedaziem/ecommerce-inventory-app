@@ -26,20 +26,16 @@ const register = asyncHandler(async (req, res, next) => {
     return next(new AppError(errors.array()[0].msg, 400));
   }
 
-  const { name, email, password, role } = req.body;
+  const { name, email, password } = req.body;
 
   const existingUser = await User.findOne({ email });
   if (existingUser) {
     return next(new AppError('Email already in use', 409));
   }
 
-  // Only allow explicit 'admin' role if requested; defaults to 'customer' otherwise.
-  const user = await User.create({
-    name,
-    email,
-    password,
-    role: role === 'admin' ? 'admin' : 'customer',
-  });
+  // Public registration always creates a customer. Any client-supplied role is ignored —
+  // admins are created out-of-band via `npm run create-admin`.
+  const user = await User.create({ name, email, password, role: 'customer' });
 
   sendAuthResponse(user, 201, res);
 });
