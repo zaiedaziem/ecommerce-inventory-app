@@ -71,6 +71,12 @@ STRIPE_WEBHOOK_SECRET=<from `stripe listen`, see below>
 PENDING_ORDER_TTL_MINUTES=60
 ```
 
+Load demo data: 3 accounts, 4 categories, 12 products with photos, and a sample order history. Safe to re-run. The demo logins are listed in `DEMO_USERS` in `backend/scripts/seed.js`.
+
+```bash
+npm run seed
+```
+
 Create an admin account (or promote an existing user):
 
 ```bash
