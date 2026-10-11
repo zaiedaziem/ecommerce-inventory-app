@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import * as orderApi from '../api/orderApi';
 import * as paymentApi from '../api/paymentApi';
+import { formatAddress } from '../constants/malaysia';
 
 export default function CheckoutPage() {
   const { items, totalAmount, clearCart } = useCart();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -15,6 +18,14 @@ export default function CheckoutPage() {
       navigate('/cart');
     }
   }, [items.length, navigate]);
+
+  // Make sure the delivery details shown are current (the stored user may be outdated).
+  useEffect(() => {
+    refreshUser().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const hasShippingDetails = Boolean(user?.phone && user?.address);
 
   const handlePay = async () => {
     setLoading(true);
@@ -61,11 +72,32 @@ export default function CheckoutPage() {
           <span className="text-xl font-bold text-slate-900">RM {totalAmount.toFixed(2)}</span>
         </div>
 
+        <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-sm font-semibold text-slate-900">Deliver to</h2>
+            <Link to="/profile" className="text-xs font-medium text-indigo-600 hover:underline">
+              {hasShippingDetails ? 'Change' : 'Add details'}
+            </Link>
+          </div>
+          {hasShippingDetails ? (
+            <div className="text-sm text-slate-600">
+              <p className="font-medium text-slate-800">
+                {user.name} · {user.phone}
+              </p>
+              <p>{formatAddress(user.address)}</p>
+            </div>
+          ) : (
+            <p className="text-sm text-amber-700">
+              Add your phone number and delivery address in your profile before paying.
+            </p>
+          )}
+        </div>
+
         {error && <p className="text-red-600 text-sm mt-3">{error}</p>}
 
         <button
           onClick={handlePay}
-          disabled={loading}
+          disabled={loading || !hasShippingDetails}
           className="mt-5 w-full py-2.5 rounded-md bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
         >
           {loading ? 'Redirecting to Stripe…' : 'Pay with Stripe'}

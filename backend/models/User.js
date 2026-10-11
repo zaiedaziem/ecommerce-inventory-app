@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const { addressSchema } = require('./addressSchema');
 
 const userSchema = new mongoose.Schema(
   {
@@ -26,6 +27,20 @@ const userSchema = new mongoose.Schema(
       enum: ['admin', 'customer'],
       default: 'customer',
     },
+    phone: {
+      type: String,
+      trim: true,
+    },
+    address: {
+      type: addressSchema,
+      default: undefined,
+    },
+    // Tokens issued before this moment are rejected (see authMiddleware), so changing the
+    // password signs out every other session.
+    passwordChangedAt: {
+      type: Date,
+      select: false,
+    },
   },
   { timestamps: true }
 );
@@ -34,6 +49,9 @@ userSchema.pre('save', async function hashPassword(next) {
   if (!this.isModified('password')) return next();
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  if (!this.isNew) {
+    this.passwordChangedAt = new Date();
+  }
   next();
 });
 

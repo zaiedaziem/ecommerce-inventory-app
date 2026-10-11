@@ -31,8 +31,31 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  // Re-reads the profile from the server (the stored copy may predate newer fields).
+  const refreshUser = async () => {
+    const { data } = await authApi.getMe();
+    localStorage.setItem('user', JSON.stringify(data.user));
+    setUser(data.user);
+    return data.user;
+  };
+
+  const updateProfile = async (changes) => {
+    const { data } = await authApi.updateProfile(changes);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    setUser(data.user);
+    return data.user;
+  };
+
+  // The server invalidates older tokens on a password change and returns a fresh one.
+  const changePassword = async (currentPassword, newPassword) => {
+    const { data } = await authApi.changePassword({ currentPassword, newPassword });
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    setUser(data.user);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout }}>
+    <AuthContext.Provider value={{ user, login, register, logout, refreshUser, updateProfile, changePassword }}>
       {children}
     </AuthContext.Provider>
   );

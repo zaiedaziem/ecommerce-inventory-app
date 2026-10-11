@@ -20,9 +20,15 @@ const protect = asyncHandler(async (req, res, next) => {
     return next(new AppError('Not authorized, invalid or expired token', 401));
   }
 
-  const user = await User.findById(decoded.id);
+  const user = await User.findById(decoded.id).select('+passwordChangedAt');
   if (!user) {
     return next(new AppError('Not authorized, user no longer exists', 401));
+  }
+
+  // JWT iat is in whole seconds; a token from the same second as the change (the fresh one
+  // returned by the change-password endpoint) is still accepted.
+  if (user.passwordChangedAt && decoded.iat < Math.floor(user.passwordChangedAt.getTime() / 1000)) {
+    return next(new AppError('Password was changed recently, please log in again', 401));
   }
 
   req.user = user;

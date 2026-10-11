@@ -5,6 +5,7 @@ A full-stack e-commerce and inventory management application with role-based aut
 ## Features
 
 - **Auth** — JWT-based registration/login with `admin` and `customer` roles (public sign-up always creates customers; admins are created via a CLI script)
+- **Profile** — users can change their password (requires the current one; signs out all other sessions by rejecting older tokens); customers save a phone number and Malaysian delivery address, which is required at checkout and copied onto each order
 - **Products & Categories** — public browsing, admin-only create/update/delete, search/filter/pagination
 - **Product photos** — admins upload a photo that is resized (max 800px) and compressed to WebP in the browser, then stored as a base64 data URI on the product; the server validates type (JPEG/PNG/WebP only) and size (≤ 500 KB)
 - **Orders** — atomic, transaction-safe stock deduction that prevents overselling under concurrent requests; customer order history; admin order management
@@ -129,6 +130,8 @@ Use Stripe's test card: `4242 4242 4242 4242`, any future expiry date, any CVC, 
 | POST | `/api/auth/register` | Public |
 | POST | `/api/auth/login` | Public |
 | GET | `/api/auth/me` | Authenticated |
+| PUT | `/api/auth/me` | Authenticated (name, phone, address) |
+| PUT | `/api/auth/password` | Authenticated (returns a fresh token) |
 | GET | `/api/products`, `/api/products/:id` | Public |
 | POST/PUT/DELETE | `/api/products` | Admin |
 | GET | `/api/categories`, `/api/categories/:id` | Public |

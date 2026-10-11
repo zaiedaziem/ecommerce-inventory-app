@@ -13,6 +13,25 @@ const loginValidator = [
   body('password').notEmpty().withMessage('Password is required'),
 ];
 
+// Address fields (required parts, 5-digit postcode, valid state) are validated by the
+// Mongoose address schema on save; this only checks the overall shape.
+const updateProfileValidator = [
+  body('name').optional().trim().notEmpty().withMessage('Name cannot be empty'),
+  body('phone')
+    .optional({ values: 'falsy' })
+    .trim()
+    .matches(/^\+?[0-9][0-9\s-]{7,15}$/)
+    .withMessage('Enter a valid phone number, e.g. 012-345 6789 or +60 12-345 6789'),
+  body('address').optional({ values: 'null' }).isObject().withMessage('Address must be an object'),
+];
+
+const changePasswordValidator = [
+  body('currentPassword').notEmpty().withMessage('Current password is required'),
+  body('newPassword')
+    .isLength({ min: 8 })
+    .withMessage('New password must be at least 8 characters long'),
+];
+
 const MAX_PRODUCT_IMAGE_BYTES = 500 * 1024;
 const IMAGE_DATA_URI = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/;
 
@@ -72,6 +91,8 @@ const createOrderValidator = [
 module.exports = {
   registerValidator,
   loginValidator,
+  updateProfileValidator,
+  changePasswordValidator,
   createProductValidator,
   updateProductValidator,
   createCategoryValidator,

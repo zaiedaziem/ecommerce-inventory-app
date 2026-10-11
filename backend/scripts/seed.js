@@ -11,13 +11,21 @@ const User = require('../models/User');
 const Category = require('../models/Category');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
-const { createOrder, cancelOrder } = require('../services/orderService');
+const { buildShippingDetails, createOrder, cancelOrder } = require('../services/orderService');
 
 // Local demo accounts only. Never reuse these credentials anywhere real.
 const DEMO_USERS = [
   { key: 'admin', name: 'Demo Admin', email: 'admin@stackcart.test', password: 'DemoAdmin123!', role: 'admin' },
-  { key: 'aisyah', name: 'Aisyah Rahman', email: 'customer@stackcart.test', password: 'DemoCustomer123!', role: 'customer' },
-  { key: 'jason', name: 'Jason Lim', email: 'jason@stackcart.test', password: 'DemoCustomer123!', role: 'customer' },
+  {
+    key: 'aisyah', name: 'Aisyah Rahman', email: 'customer@stackcart.test', password: 'DemoCustomer123!', role: 'customer',
+    phone: '012-345 6789',
+    address: { line1: '12, Jalan SS 2/24', line2: 'Taman Bahagia', city: 'Petaling Jaya', postcode: '47300', state: 'Selangor' },
+  },
+  {
+    key: 'jason', name: 'Jason Lim', email: 'jason@stackcart.test', password: 'DemoCustomer123!', role: 'customer',
+    phone: '016-789 1234',
+    address: { line1: '8-3, Jalan Burma', city: 'George Town', postcode: '10050', state: 'Pulau Pinang' },
+  },
 ];
 
 const CATEGORIES = [
@@ -78,10 +86,30 @@ async function seedUsers() {
     if (!user) {
       user = await User.create(data);
       console.log(`  created ${data.role} ${data.email}`);
+    } else if (data.address && !user.address) {
+      // Accounts seeded before profiles existed get the demo phone/address filled in.
+      user.phone = user.phone || data.phone;
+      user.address = data.address;
+      await user.save();
+      console.log(`  added phone/address to ${data.email}`);
     }
     users[key] = user;
   }
   return users;
+}
+
+// Orders seeded before shipping snapshots existed get one from the demo customer's profile.
+async function backfillOrderShipping(users) {
+  let updated = 0;
+  for (const user of Object.values(users)) {
+    if (!user.address) continue;
+    const { modifiedCount } = await Order.updateMany(
+      { user: user._id, 'shipping.address': { $exists: false } },
+      { $set: { shipping: buildShippingDetails(user) } }
+    );
+    updated += modifiedCount;
+  }
+  if (updated > 0) console.log(`  added shipping details to ${updated} existing order(s)`);
 }
 
 async function seedCategories() {
@@ -125,7 +153,7 @@ async function seedOrders(users, products) {
     const items = spec.items.map(([name, quantity]) => ({ productId: products[name]._id, quantity }));
     let order;
     try {
-      order = await createOrder(users[spec.user]._id, items);
+      order = await createOrder(users[spec.user]._id, items, buildShippingDetails(users[spec.user]));
     } catch (err) {
       // e.g. a pre-existing product with too little stock; skip rather than abort the seed.
       console.warn(`  skipped an order for ${spec.user}: ${err.message}`);
@@ -167,6 +195,7 @@ async function main() {
   const categories = await seedCategories();
   const products = await seedProducts(categories, users.admin);
   await seedOrders(users, products);
+  await backfillOrderShipping(users);
 
   console.log('Done. Demo logins are listed in DEMO_USERS in backend/scripts/seed.js');
   await mongoose.disconnect();

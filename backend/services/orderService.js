@@ -67,9 +67,20 @@ async function applyTransition(order, newStatus, session, extraFields = {}) {
   return order;
 }
 
+// Builds the shipping snapshot stored on a new order from the customer's profile.
+function buildShippingDetails(user) {
+  if (!user.phone || !user.address) {
+    throw new AppError(
+      'Please add your phone number and shipping address in your profile before checking out',
+      400
+    );
+  }
+  return { name: user.name, phone: user.phone, address: user.address.toObject?.() ?? user.address };
+}
+
 // Creates an order: deducts stock for every item atomically, then persists the order.
 // Uses a transaction so a mid-order stock failure rolls back all prior deductions.
-async function createOrder(userId, items) {
+async function createOrder(userId, items, shipping) {
   if (!items || items.length === 0) {
     throw new AppError('Order must contain at least one item', 400);
   }
@@ -89,7 +100,7 @@ async function createOrder(userId, items) {
     }
 
     const created = await Order.create(
-      [{ user: userId, items: orderItems, totalAmount }],
+      [{ user: userId, items: orderItems, totalAmount, shipping }],
       { session }
     );
     return created[0];
@@ -228,6 +239,7 @@ async function cancelStalePendingOrders(maxAgeMinutes) {
 
 module.exports = {
   ORDER_TRANSITIONS,
+  buildShippingDetails,
   createOrder,
   cancelOrder,
   cancelOwnOrder,

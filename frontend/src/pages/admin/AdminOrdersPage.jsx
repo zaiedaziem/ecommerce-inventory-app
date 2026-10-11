@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import * as orderApi from '../../api/orderApi';
 import OrderStatusBadge from '../../components/OrderStatusBadge';
+import { formatAddress } from '../../constants/malaysia';
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
@@ -54,6 +55,12 @@ export default function AdminOrdersPage() {
                 <p className="text-sm text-slate-700 mt-0.5">
                   {order.user?.name} <span className="text-slate-400">({order.user?.email})</span>
                 </p>
+                {order.shipping?.address && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    <span className="font-medium text-slate-600">Ship to:</span> {order.shipping.phone} ·{' '}
+                    {formatAddress(order.shipping.address)}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-2">

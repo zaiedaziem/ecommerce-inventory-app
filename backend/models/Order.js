@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { addressSchema } = require('./addressSchema');
 
 const orderItemSchema = new mongoose.Schema(
   {
@@ -45,6 +46,13 @@ const orderSchema = new mongoose.Schema(
       type: String,
       enum: ['pending', 'paid', 'shipped', 'delivered', 'cancelled'],
       default: 'pending',
+    },
+    // Copy of the customer's contact details when the order was placed, so later profile
+    // edits don't change where an existing order ships.
+    shipping: {
+      name: { type: String },
+      phone: { type: String },
+      address: { type: addressSchema },
     },
     // Most recent Stripe Checkout Session for this order. Used to reuse an open session
     // instead of creating duplicates, and to ignore expiry events from superseded sessions.

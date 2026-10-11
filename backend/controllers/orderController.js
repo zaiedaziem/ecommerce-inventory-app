@@ -3,6 +3,7 @@ const Order = require('../models/Order');
 const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
 const {
+  buildShippingDetails,
   createOrder: createOrderService,
   shipOrder: shipOrderService,
   cancelOwnOrder,
@@ -16,7 +17,8 @@ const createOrder = asyncHandler(async (req, res, next) => {
     return next(new AppError(errors.array()[0].msg, 400));
   }
 
-  const order = await createOrderService(req.user._id, req.body.items);
+  const shipping = buildShippingDetails(req.user);
+  const order = await createOrderService(req.user._id, req.body.items, shipping);
 
   res.status(201).json({ success: true, order });
 });

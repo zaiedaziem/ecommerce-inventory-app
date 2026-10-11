@@ -61,12 +61,17 @@ export default function Navbar() {
                   Admin
                 </Link>
               )}
-              <span className="hidden sm:inline text-sm text-slate-500">
-                {user.name}{' '}
-                <span className="ml-1 inline-block px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium capitalize">
+              <Link
+                to="/profile"
+                title="My profile"
+                className="text-sm text-slate-500 hover:text-indigo-600 transition-colors"
+              >
+                <span className="hidden sm:inline">{user.name} </span>
+                <span className="sm:hidden font-medium text-slate-600">Profile</span>
+                <span className="hidden sm:inline-block ml-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium capitalize">
                   {user.role}
                 </span>
-              </span>
+              </Link>
               <button
                 onClick={handleLogout}
                 className="text-sm font-medium px-3 py-1.5 rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors"
