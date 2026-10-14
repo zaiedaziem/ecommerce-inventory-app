@@ -1,5 +1,9 @@
 const express = require('express');
-const { createCheckoutSessionHandler, handleWebhook } = require('../controllers/paymentController');
+const {
+  createCheckoutSessionHandler,
+  verifyPaymentHandler,
+  handleWebhook,
+} = require('../controllers/paymentController');
 const { protect } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
@@ -9,5 +13,6 @@ const router = express.Router();
 router.post('/webhook', handleWebhook);
 
 router.post('/checkout-session', protect, createCheckoutSessionHandler);
+router.post('/verify/:orderId', protect, verifyPaymentHandler);
 
 module.exports = router;

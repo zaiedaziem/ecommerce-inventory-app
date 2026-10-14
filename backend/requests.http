@@ -160,8 +160,8 @@ Authorization: Bearer {{admin_token}}
 PUT http://localhost:5000/api/orders/ORDER_ID/ship
 Authorization: Bearer {{admin_token}}
 
-### Cancel own order before it ships (as customer) — paid orders are refunded via Stripe
-PUT http://localhost:5000/api/orders/ORDER_ID/cancel
+### Confirm a payment directly with Stripe (as customer) — backup for a missed webhook
+POST http://localhost:5000/api/payments/verify/ORDER_ID
 Authorization: Bearer {{customer_token}}
 
 ### Confirm a shipped order was received (as customer)

@@ -9,7 +9,7 @@ A full-stack e-commerce and inventory management application with role-based aut
 - **Products & Categories** — public browsing, admin-only create/update/delete, search/filter/pagination
 - **Product photos** — admins upload a photo that is resized (max 800px) and compressed to WebP in the browser, then stored as a base64 data URI on the product; the server validates type (JPEG/PNG/WebP only) and size (≤ 500 KB)
 - **Orders** — atomic, transaction-safe stock deduction that prevents overselling under concurrent requests; customer order history; admin order management
-- **Order lifecycle** — enforced, role-based status transitions: orders become `paid` only via the Stripe webhook, admins mark paid orders `shipped`, and customers confirm `delivered` ("Order received") or cancel before shipping. Cancelling returns stock to inventory and automatically refunds paid orders through Stripe. Abandoned checkouts are cancelled automatically so they don't hold stock
+- **Order lifecycle** — enforced, role-based status transitions: orders become `paid` only when Stripe confirms payment, admins mark paid orders `shipped`, and customers confirm `delivered` ("Order received"). Payment is confirmed by the webhook and, as a backup, by checking the Checkout Session directly when the customer returns or views their orders. Unpaid (abandoned) checkouts are cancelled automatically and their stock returned
 - **Payments** — Stripe Checkout Session integration (MYR currency) with idempotent, webhook-driven order status updates (`checkout.session.completed` / `checkout.session.expired`)
 - **Admin dashboard** — manage products, categories, and orders from the UI
 - **Centralized error handling & input validation** on every route
@@ -140,9 +140,9 @@ Use Stripe's test card: `4242 4242 4242 4242`, any future expiry date, any CVC, 
 | GET | `/api/orders/my-orders` | Customer |
 | GET | `/api/orders`, `/api/orders/:id` | Admin (or order owner for `:id`) |
 | PUT | `/api/orders/:id/ship` | Admin (paid → shipped) |
-| PUT | `/api/orders/:id/cancel` | Order owner (pending/paid → cancelled; paid orders are refunded) |
 | PUT | `/api/orders/:id/receive` | Order owner (shipped → delivered) |
 | POST | `/api/payments/checkout-session` | Customer |
+| POST | `/api/payments/verify/:orderId` | Order owner (confirms payment with Stripe directly) |
 | POST | `/api/payments/webhook` | Stripe (signature-verified) |
 
 See [USE_CASES.md](USE_CASES.md) for the full use-case breakdown by actor.

@@ -52,37 +52,18 @@ async function createCheckoutSession(order, customerEmail) {
   return session;
 }
 
-// Ensures a Checkout Session can no longer be paid. Throws if payment already went through,
-// since the order must not be cancelled out from under a completed payment.
+function retrieveCheckoutSession(sessionId) {
+  return stripe.checkout.sessions.retrieve(sessionId);
+}
+
+// Ensures a Checkout Session can no longer be paid, expiring it if it's still open.
+// Returns the session so the caller can see whether it was already completed (paid).
 async function releaseCheckoutSession(sessionId) {
-  const session = await stripe.checkout.sessions.retrieve(sessionId);
-  if (session.status === 'complete') {
-    throw new AppError('Payment for this order has already been completed', 409);
-  }
+  const session = await retrieveCheckoutSession(sessionId);
   if (session.status === 'open') {
-    await stripe.checkout.sessions.expire(sessionId);
+    return stripe.checkout.sessions.expire(sessionId);
   }
+  return session;
 }
 
-// Refunds the full payment for a cancelled order and records the outcome on the order.
-// The idempotency key makes a retry for the same order return the original refund rather
-// than refunding twice. Never throws: a failure is recorded as refundStatus 'failed'.
-async function refundOrderPayment(order) {
-  try {
-    const refund = await stripe.refunds.create(
-      { payment_intent: order.stripePaymentIntentId, metadata: { orderId: order._id.toString() } },
-      { idempotencyKey: `refund-order-${order._id}` }
-    );
-    // Card refunds are accepted as 'succeeded' or 'pending' (settling); both mean refunded.
-    const refundStatus = refund.status === 'failed' || refund.status === 'canceled' ? 'failed' : 'refunded';
-    await Order.updateOne({ _id: order._id }, { refundStatus, stripeRefundId: refund.id });
-    Object.assign(order, { refundStatus, stripeRefundId: refund.id });
-  } catch (err) {
-    console.error(`Refund failed for order ${order._id}: ${err.message}`);
-    await Order.updateOne({ _id: order._id }, { refundStatus: 'failed' });
-    order.refundStatus = 'failed';
-  }
-  return order;
-}
-
-module.exports = { createCheckoutSession, releaseCheckoutSession, refundOrderPayment };
+module.exports = { createCheckoutSession, retrieveCheckoutSession, releaseCheckoutSession };

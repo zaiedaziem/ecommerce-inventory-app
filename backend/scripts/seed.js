@@ -11,7 +11,7 @@ const User = require('../models/User');
 const Category = require('../models/Category');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
-const { buildShippingDetails, createOrder, cancelOrder } = require('../services/orderService');
+const { buildShippingDetails, createOrder, cancelPendingOrder } = require('../services/orderService');
 
 // Local demo accounts only. Never reuse these credentials anywhere real.
 const DEMO_USERS = [
@@ -164,7 +164,7 @@ async function seedOrders(users, products) {
 
     if (spec.status === 'cancelled') {
       // Goes through the real cancellation path, so stock is returned.
-      await cancelOrder(order._id);
+      await cancelPendingOrder(order._id);
     } else {
       // Demo orders skip Stripe, so mark them paid (and beyond) directly.
       const after = (hours) => new Date(placedAt.getTime() + hours * 60 * 60 * 1000);

@@ -1,18 +1,19 @@
 const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const { deductStock, restoreStock } = require('./inventoryService');
-const { releaseCheckoutSession, refundOrderPayment } = require('./paymentService');
+const { releaseCheckoutSession, retrieveCheckoutSession } = require('./paymentService');
 const AppError = require('../utils/AppError');
 
 // Allowed order status transitions. Terminal states have no outgoing transitions.
 // Who may trigger each one:
-//   pending -> paid       Stripe webhook only (never set by hand)
-//   paid -> shipped       admin
-//   pending/paid -> cancelled   customer (paid orders are refunded), or the stale-order sweep
-//   shipped -> delivered  customer confirms receipt
+//   pending -> paid        Stripe only: the webhook, or a direct check of the Checkout Session
+//   pending -> cancelled   the system, when an unpaid checkout expires or goes stale
+//   paid -> shipped        admin
+//   shipped -> delivered   customer confirms receipt
+// Paid orders can't be cancelled, so a payment never needs refunding.
 const ORDER_TRANSITIONS = {
   pending: ['paid', 'cancelled'],
-  paid: ['shipped', 'cancelled'],
+  paid: ['shipped'],
   shipped: ['delivered'],
   delivered: [],
   cancelled: [],
@@ -119,44 +120,63 @@ async function findOwnOrder(orderId, userId) {
   return order;
 }
 
-// Cancels an order and returns its stock.
-// - Pending: any open Stripe Checkout Session is expired first so it can't be paid afterwards.
-// - Paid: the status change commits first, then the payment is refunded. Cancelling before
-//   refunding means a concurrent "mark as shipped" can't slip in after money was returned;
-//   if the refund call fails, the order is flagged refundStatus 'failed' for follow-up.
-async function cancelOrder(orderId) {
+// Cancels an unpaid order and returns its stock. Any open Stripe Checkout Session is expired
+// first so it can't be paid afterwards. If it turns out the customer already paid (e.g. the
+// webhook hasn't arrived yet), the order is marked paid instead. Returns the updated order.
+async function cancelPendingOrder(orderId) {
   const order = await Order.findById(orderId);
   if (!order) {
     throw new AppError('Order not found', 404);
   }
-  if (order.status !== 'cancelled' && !canTransition(order.status, 'cancelled')) {
-    const reason = order.status === 'shipped' || order.status === 'delivered'
-      ? 'it has already been shipped'
-      : `it is ${order.status}`;
-    throw new AppError(`This order can no longer be cancelled because ${reason}`, 400);
+  if (order.status !== 'pending') {
+    return order;
   }
 
-  if (order.status === 'pending' && order.stripeSessionId) {
-    await releaseCheckoutSession(order.stripeSessionId);
+  if (order.stripeSessionId) {
+    const checkout = await releaseCheckoutSession(order.stripeSessionId);
+    if (checkout.status === 'complete') {
+      return checkout.payment_status === 'paid'
+        ? markOrderPaid(order._id, checkout.id, checkout.payment_intent)
+        : order;
+    }
   }
 
-  let needsRefund = false;
-  const cancelled = await runInTransaction(async (session) => {
+  return runInTransaction(async (session) => {
     const current = await Order.findById(orderId).session(session);
-    needsRefund = current.status === 'paid' && Boolean(current.stripePaymentIntentId);
-    return applyTransition(current, 'cancelled', session, needsRefund ? { refundStatus: 'pending' } : {});
+    return applyTransition(current, 'cancelled', session);
   });
-
-  if (needsRefund) {
-    await refundOrderPayment(cancelled);
-  }
-  return cancelled;
 }
 
-// Customer cancels their own order (allowed until it ships).
-async function cancelOwnOrder(orderId, userId) {
-  await findOwnOrder(orderId, userId);
-  return cancelOrder(orderId);
+// Asks Stripe directly whether a pending order's checkout was paid, and marks it paid if so.
+// Backs up the webhook (which can be delayed, or missed if the listener isn't running).
+// Returns true if the order was updated.
+async function syncOrderPayment(order) {
+  if (order.status !== 'pending' || !order.stripeSessionId) {
+    return false;
+  }
+  const checkout = await retrieveCheckoutSession(order.stripeSessionId);
+  if (checkout.status !== 'complete' || checkout.payment_status !== 'paid') {
+    return false;
+  }
+  const updated = await markOrderPaid(order._id, checkout.id, checkout.payment_intent);
+  return updated?.status === 'paid';
+}
+
+// Syncs every pending order in a list (e.g. before returning order history). A Stripe error
+// on one order is logged and doesn't fail the request. Returns how many orders changed.
+async function syncPendingPayments(orders) {
+  const results = await Promise.allSettled(orders.map(syncOrderPayment));
+  results
+    .filter((r) => r.status === 'rejected')
+    .forEach((r) => console.error(`Payment sync failed: ${r.reason.message}`));
+  return results.filter((r) => r.status === 'fulfilled' && r.value).length;
+}
+
+// Customer returning from Stripe asks for their order's payment to be confirmed.
+async function verifyOrderPayment(orderId, userId) {
+  const order = await findOwnOrder(orderId, userId);
+  await syncOrderPayment(order);
+  return Order.findById(orderId);
 }
 
 // Customer confirms a shipped order arrived.
@@ -172,7 +192,7 @@ async function confirmOrderReceived(orderId, userId) {
 }
 
 // Admin status update. Admins only ship paid orders: payment is confirmed by Stripe,
-// and cancelling or confirming delivery is up to the customer.
+// and confirming delivery is up to the customer.
 async function shipOrder(orderId) {
   return runInTransaction(async (session) => {
     const order = await Order.findById(orderId).session(session);
@@ -197,6 +217,7 @@ async function markOrderPaid(orderId, stripeSessionId, stripePaymentIntentId) {
     }
     if (order.status !== 'pending') {
       if (order.status === 'cancelled') {
+        // Shouldn't happen: sessions are expired before an order is cancelled.
         console.error(
           `Payment received for cancelled order ${orderId}: refund required (payment_intent ${stripePaymentIntentId})`
         );
@@ -228,8 +249,8 @@ async function cancelStalePendingOrders(maxAgeMinutes) {
   let cancelled = 0;
   for (const { _id } of stale) {
     try {
-      await cancelOrder(_id);
-      cancelled += 1;
+      const order = await cancelPendingOrder(_id);
+      if (order.status === 'cancelled') cancelled += 1;
     } catch (err) {
       console.error(`Failed to cancel stale order ${_id}: ${err.message}`);
     }
@@ -241,11 +262,12 @@ module.exports = {
   ORDER_TRANSITIONS,
   buildShippingDetails,
   createOrder,
-  cancelOrder,
-  cancelOwnOrder,
+  cancelPendingOrder,
   confirmOrderReceived,
   shipOrder,
   markOrderPaid,
+  syncPendingPayments,
+  verifyOrderPayment,
   cancelOrderForExpiredSession,
   cancelStalePendingOrders,
 };

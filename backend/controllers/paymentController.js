@@ -3,7 +3,11 @@ const Order = require('../models/Order');
 const AppError = require('../utils/AppError');
 const asyncHandler = require('../utils/asyncHandler');
 const { createCheckoutSession } = require('../services/paymentService');
-const { markOrderPaid, cancelOrderForExpiredSession } = require('../services/orderService');
+const {
+  markOrderPaid,
+  cancelOrderForExpiredSession,
+  verifyOrderPayment,
+} = require('../services/orderService');
 
 // POST /api/payments/checkout-session (customer) — starts Stripe checkout for a pending order.
 const createCheckoutSessionHandler = asyncHandler(async (req, res, next) => {
@@ -28,6 +32,14 @@ const createCheckoutSessionHandler = asyncHandler(async (req, res, next) => {
   const session = await createCheckoutSession(order, req.user.email);
 
   res.status(200).json({ success: true, url: session.url });
+});
+
+// POST /api/payments/verify/:orderId (order owner) — called when the customer returns from
+// Stripe. Checks the Checkout Session directly so the order shows as paid even if the
+// webhook is delayed or wasn't delivered.
+const verifyPaymentHandler = asyncHandler(async (req, res) => {
+  const order = await verifyOrderPayment(req.params.orderId, req.user._id);
+  res.status(200).json({ success: true, order });
 });
 
 // POST /api/payments/webhook (Stripe) — must receive the raw request body (see server.js).
@@ -56,4 +68,4 @@ const handleWebhook = asyncHandler(async (req, res, next) => {
   res.status(200).json({ received: true });
 });
 
-module.exports = { createCheckoutSessionHandler, handleWebhook };
+module.exports = { createCheckoutSessionHandler, verifyPaymentHandler, handleWebhook };

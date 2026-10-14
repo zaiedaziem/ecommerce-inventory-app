@@ -5,7 +5,6 @@ const {
   getAllOrders,
   getOrder,
   shipOrder,
-  cancelOrder,
   receiveOrder,
 } = require('../controllers/orderController');
 const { createOrderValidator } = require('../utils/validators');
@@ -21,8 +20,7 @@ router.get('/my-orders', getMyOrders);
 router.get('/', restrictTo('admin'), getAllOrders);
 router.get('/:id', getOrder);
 router.put('/:id/ship', restrictTo('admin'), shipOrder);
-// Owner-only checks for these two live in the order service.
-router.put('/:id/cancel', cancelOrder);
+// The owner-only check lives in the order service.
 router.put('/:id/receive', receiveOrder);
 
 module.exports = router;

@@ -62,10 +62,6 @@ const orderSchema = new mongoose.Schema(
     shippedAt: { type: Date },
     deliveredAt: { type: Date },
     cancelledAt: { type: Date },
-    // Set when a paid order is cancelled. 'pending' = refund being requested from Stripe,
-    // 'refunded' = Stripe accepted the refund, 'failed' = needs manual follow-up.
-    refundStatus: { type: String, enum: ['pending', 'refunded', 'failed'] },
-    stripeRefundId: { type: String },
   },
   { timestamps: true }
 );

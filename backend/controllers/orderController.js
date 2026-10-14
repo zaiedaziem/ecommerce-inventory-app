@@ -6,9 +6,16 @@ const {
   buildShippingDetails,
   createOrder: createOrderService,
   shipOrder: shipOrderService,
-  cancelOwnOrder,
   confirmOrderReceived,
+  syncPendingPayments,
 } = require('../services/orderService');
+
+// Before listing orders, confirm any pending checkouts with Stripe so a payment whose webhook
+// was delayed or missed still shows as paid.
+async function syncPendingCheckouts(filter) {
+  const pending = await Order.find({ ...filter, status: 'pending', stripeSessionId: { $exists: true } });
+  await syncPendingPayments(pending);
+}
 
 // POST /api/orders (customer)
 const createOrder = asyncHandler(async (req, res, next) => {
@@ -25,6 +32,7 @@ const createOrder = asyncHandler(async (req, res, next) => {
 
 // GET /api/orders/my-orders (customer) — own order history
 const getMyOrders = asyncHandler(async (req, res) => {
+  await syncPendingCheckouts({ user: req.user._id });
   const orders = await Order.find({ user: req.user._id })
     .populate('items.product', 'name price')
     .sort({ createdAt: -1 });
@@ -34,6 +42,7 @@ const getMyOrders = asyncHandler(async (req, res) => {
 
 // GET /api/orders (admin) — all orders
 const getAllOrders = asyncHandler(async (req, res) => {
+  await syncPendingCheckouts({});
   const orders = await Order.find()
     .populate('user', 'name email')
     .populate('items.product', 'name price')
@@ -66,12 +75,6 @@ const shipOrder = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, order });
 });
 
-// PUT /api/orders/:id/cancel (order owner) — allowed until shipped; paid orders are refunded
-const cancelOrder = asyncHandler(async (req, res) => {
-  const order = await cancelOwnOrder(req.params.id, req.user._id);
-  res.status(200).json({ success: true, order });
-});
-
 // PUT /api/orders/:id/receive (order owner) — shipped -> delivered
 const receiveOrder = asyncHandler(async (req, res) => {
   const order = await confirmOrderReceived(req.params.id, req.user._id);
@@ -84,6 +87,5 @@ module.exports = {
   getAllOrders,
   getOrder,
   shipOrder,
-  cancelOrder,
   receiveOrder,
 };
